@@ -20,6 +20,11 @@ set(TARGET_TRIPLE aarch64-linux-ohos)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --target=${TARGET_TRIPLE} --sysroot=${OHOS_NDK}/native/sysroot -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=${TARGET_TRIPLE} --sysroot=${OHOS_NDK}/native/sysroot -fPIC")
 
+# 设置汇编器选项：使用集成汇编器，支持 GNU 汇编语法
+# 注意：鸿蒙 Clang 的汇编器对某些 GNU 语法支持有限，可能需要禁用 ARM82 优化
+# 添加 -integrated-as 确保使用集成汇编器，并设置正确的架构
+set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} --target=${TARGET_TRIPLE} --sysroot=${OHOS_NDK}/native/sysroot -fPIC -integrated-as -march=armv8-a")
+
 # 设置 sysroot
 set(CMAKE_SYSROOT "${OHOS_NDK}/native/sysroot")
 

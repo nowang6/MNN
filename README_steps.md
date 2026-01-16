@@ -73,6 +73,7 @@ cd build_ohos
 
 # 3. 配置 CMake（关键步骤）
 # 注意：鸿蒙平台使用 ARM64 架构，不需要 x86 特定的优化选项（SSE、AVX512）
+# 重要：禁用 ARM82 优化以避免汇编编译错误（鸿蒙 Clang 对汇编语法支持有限）
 # MNN_LLM_BUILD_DEMO 默认为 ON，会自动编译 llm_demo 等工具
 cmake .. \
     -DCMAKE_TOOLCHAIN_FILE=../ohos-toolchain.cmake \
@@ -88,6 +89,7 @@ cmake .. \
     -DMNN_OPENCL=OFF \
     -DMNN_USE_SSE=OFF \
     -DMNN_AVX512=OFF \
+    -DMNN_ARM82=OFF \
     -DMNN_BUILD_TESTS=OFF
 
 # 4. 编译（多线程）
@@ -113,6 +115,22 @@ cmake --build . --config Release -j $(nproc)
 3. **后端**：CPU 推理配置禁用了所有 GPU 后端（Vulkan、Metal、OpenCL）
 4. **工具链**：使用项目自带的 `ohos-toolchain.cmake` 文件进行交叉编译
 5. **分离构建**：设置 `MNN_SEP_BUILD=OFF` 将所有后端编译到主库中，简化部署
+6. **ARM82 优化**：**必须禁用 ARM82**（`-DMNN_ARM82=OFF`），因为鸿蒙 Clang 编译器对 ARM82 汇编代码的语法支持有限，会导致编译错误。禁用后仍可使用标准的 ARM64 NEON 优化，性能影响较小。
+
+#### 故障排除
+
+如果编译时仍然遇到 ARM64 汇编文件（`.S` 文件）的编译错误，可能是鸿蒙 Clang 对某些 GNU 汇编语法支持不完整。可以尝试以下解决方案：
+
+**方案 1：检查工具链配置**
+确保 `ohos-toolchain.cmake` 已正确配置汇编器选项。如果问题持续，可以尝试在 CMake 配置中添加：
+```bash
+cmake .. \
+    ...其他选项... \
+    -DCMAKE_ASM_FLAGS="--target=aarch64-linux-ohos --sysroot=$OHOS_NDK/native/sysroot -fPIC -integrated-as -march=armv8-a"
+```
+
+**方案 2：如果汇编错误无法解决**
+如果 ARM64 汇编文件编译仍然失败，可能需要联系 MNN 项目维护者或考虑使用其他交叉编译工具链。标准的 ARM64 NEON C++ 代码应该可以正常编译，只是性能可能略低于汇编优化版本。
 
 ## 剩余步骤（需要手动执行）
 
