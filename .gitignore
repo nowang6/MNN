@@ -388,3 +388,10 @@ apps/Android/.qoder/settings.json
 apps/Android/MnnLlmChatOld
 
 transformers/llm/export/tmp/
+
+Qwen3-0.6B
+
+
+transformers/llm/export/Qwen3-0.6B/
+
+transformers/qwen_mnn_model/
