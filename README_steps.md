@@ -44,6 +44,76 @@ make -j$(nproc)
 * `llm_bench`：LLM 基准测试工具
 * `quantize_llm`：LLM 量化工具
 
+### 2.1 编译 MNN for HarmonyOS (鸿蒙) - CPU 推理
+
+参考 llama.cpp 的鸿蒙编译步骤，执行以下步骤在鸿蒙平台上编译 MNN（使用 CPU 推理）：
+
+#### 环境准备
+
+```bash
+# 1. 设置 OHOS_NDK 环境变量（必须）
+# 将 OHOS_NDK 设置为鸿蒙 NDK 的安装路径
+export OHOS_NDK=/path/to/ohos-ndk
+
+# 2. 验证编译器（可选）
+$OHOS_NDK/native/llvm/bin/clang --target=aarch64-linux-ohos --version
+# 应显示：Target: aarch64-unknown-linux-ohos
+```
+
+#### 构建步骤
+
+```bash
+# 1. 生成 schema 文件
+./schema/generate.sh
+
+# 2. 清理并创建构建目录
+rm -rf build_ohos
+mkdir build_ohos
+cd build_ohos
+
+# 3. 配置 CMake（关键步骤）
+# 注意：鸿蒙平台使用 ARM64 架构，不需要 x86 特定的优化选项（SSE、AVX512）
+# MNN_LLM_BUILD_DEMO 默认为 ON，会自动编译 llm_demo 等工具
+cmake .. \
+    -DCMAKE_TOOLCHAIN_FILE=../ohos-toolchain.cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DMNN_BUILD_LLM=ON \
+    -DMNN_LOW_MEMORY=ON \
+    -DMNN_CPU_WEIGHT_DEQUANT_GEMM=ON \
+    -DMNN_SUPPORT_TRANSFORMER_FUSE=ON \
+    -DMNN_BUILD_SHARED_LIBS=ON \
+    -DMNN_SEP_BUILD=OFF \
+    -DMNN_VULKAN=OFF \
+    -DMNN_METAL=OFF \
+    -DMNN_OPENCL=OFF \
+    -DMNN_USE_SSE=OFF \
+    -DMNN_AVX512=OFF \
+    -DMNN_BUILD_TESTS=OFF
+
+# 4. 编译（多线程）
+cmake --build . --config Release -j $(nproc)
+
+# 或者使用 make
+# make -j$(nproc)
+```
+
+**编译成功后生成的关键文件：**
+
+* `libMNN.so`：MNN 主库（ARM64 架构，适用于鸿蒙系统）
+* `llm_demo`：LLM 推理演示程序（默认编译，由 `MNN_LLM_BUILD_DEMO` 控制）
+* `llm_bench`：LLM 基准测试工具
+* `quantize_llm`：LLM 量化工具
+* `embedding_demo`：Embedding 演示程序
+* `reranker_demo`：Reranker 演示程序
+
+**重要说明：**
+
+1. **环境变量**：必须设置 `OHOS_NDK` 环境变量指向鸿蒙 NDK 安装路径
+2. **架构**：鸿蒙平台使用 ARM64 架构，因此禁用了 x86 特定的优化选项（`MNN_USE_SSE=OFF`、`MNN_AVX512=OFF`）
+3. **后端**：CPU 推理配置禁用了所有 GPU 后端（Vulkan、Metal、OpenCL）
+4. **工具链**：使用项目自带的 `ohos-toolchain.cmake` 文件进行交叉编译
+5. **分离构建**：设置 `MNN_SEP_BUILD=OFF` 将所有后端编译到主库中，简化部署
+
 ## 剩余步骤（需要手动执行）
 
 ### 3. 安装 Python 依赖
