@@ -132,6 +132,52 @@ cmake .. \
 **方案 2：如果汇编错误无法解决**
 如果 ARM64 汇编文件编译仍然失败，可能需要联系 MNN 项目维护者或考虑使用其他交叉编译工具链。标准的 ARM64 NEON C++ 代码应该可以正常编译，只是性能可能略低于汇编优化版本。
 
+**方案 3：运行时 `__emutls_get_address` 符号未找到错误**
+
+如果在鸿蒙手机上运行时遇到以下错误：
+```
+Error relocating /data/local/tmp/mnn/libMNN.so: __emutls_get_address: symbol not found
+```
+
+**原因：**
+- 鸿蒙/OpenHarmony SDK 在 API 9 或更早版本的 `libc++_shared.so` 中没有 `__emutls_get_address` 这个符号
+- 这个符号从 API 11 才开始提供
+- 代码中使用了 `thread_local`（线程局部存储），而旧版系统库不支持
+
+**解决方案：**
+
+1. **已自动修复（推荐）**：`ohos-toolchain.cmake` 已添加 `-fno-emulated-tls` 选项，禁用 TLS 模拟并使用原生 TLS。重新编译即可：
+   ```bash
+   cd build_ohos
+   rm -rf *
+   cmake .. \
+       -DCMAKE_TOOLCHAIN_FILE=../ohos-toolchain.cmake \
+       -DCMAKE_BUILD_TYPE=Release \
+       -DMNN_BUILD_LLM=ON \
+       -DMNN_LOW_MEMORY=ON \
+       -DMNN_CPU_WEIGHT_DEQUANT_GEMM=ON \
+       -DMNN_SUPPORT_TRANSFORMER_FUSE=ON \
+       -DMNN_BUILD_SHARED_LIBS=ON \
+       -DMNN_SEP_BUILD=OFF \
+       -DMNN_VULKAN=OFF \
+       -DMNN_METAL=OFF \
+       -DMNN_OPENCL=OFF \
+       -DMNN_USE_SSE=OFF \
+       -DMNN_AVX512=OFF \
+       -DMNN_ARM82=OFF \
+       -DMNN_BUILD_TESTS=OFF
+   cmake --build . --config Release -j $(nproc)
+   ```
+
+2. **如果方案 1 仍无法解决**：可以尝试静态链接 C++ 库。编辑 `ohos-toolchain.cmake`，取消注释以下行：
+   ```cmake
+   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+   ```
+   然后重新编译。注意：这会让 `.so` 文件更大。
+
+3. **检查系统版本**：确认鸿蒙手机的 API level。如果是 API ≤ 9，建议升级系统到 API 11 或更高版本（如果可能）。
+
 ## 剩余步骤（需要手动执行）
 
 ### 3. 安装 Python 依赖
@@ -154,10 +200,10 @@ Qwen3-0.6B 模型已下载到当前目录的 `Qwen3-0.6B/` 文件夹（safetenso
 ```bash
 cd transformers/llm/export
 python3 llmexport.py \
-  --path ../../Qwen3-0.6B \
+  --path ../../../Qwen3-0.6B \
   --export mnn \
   --quant_bit 4 \
-  --dst_path ../../qwen_mnn_model
+  --dst_path ../../../qwen_mnn_model
 ```
 
 **参数说明：**
@@ -211,7 +257,7 @@ cd build
 ./llm_demo ../qwen_mnn_model/config.json
 
 # 或批量处理 prompt.txt 文件中的提示词
-./llm_demo ../qwen_mnn_model/config.json ../prompt.txt
+LD_LIBRARY_PATH=/data/local/tmp/usearch_sqlite_dist/lib/ ./llm_demo /qwen_mnn_model/config.json prompt.txt
 ```
 
 ### 7. 创建 prompt.txt 文件（可选）
